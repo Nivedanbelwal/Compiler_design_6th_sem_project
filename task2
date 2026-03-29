@@ -1,0 +1,11 @@
+# Module 1 — The Editor UI
+- [x] All items completed and verified
+
+# Module 2 — The Backend API
+- [ ] Set up Express.js backend with project structure
+- [ ] Create POST /execute endpoint with { language, code, input }
+- [ ] Add input validation (empty code, unsupported languages)
+- [ ] Return { output, error, executionTime } response format
+- [ ] Add rate limiting (5 runs/min/IP)
+- [ ] Connect frontend to backend API
+- [ ] Verify end-to-end flow
