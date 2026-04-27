@@ -5,7 +5,7 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
-  cacheDir: path.join(os.tmpdir(), 'vite-codeforge-cache'),
+  cacheDir: path.join(os.tmpdir(), 'vite-codeezy-cache'),
   optimizeDeps: {
     force: true,
   },

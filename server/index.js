@@ -12,9 +12,9 @@ app.use(express.json({ limit: '1mb' }));
 
 // ─── Rate Limiter (5 runs per minute per IP) ────────────────
 const executeLimiter = rateLimit({
-  windowMs: 60 * 1000,       // 1 minute window
-  max: 5,                     // max 5 requests per window per IP
-  standardHeaders: true,      // Return rate limit info in `RateLimit-*` headers
+  windowMs: 60 * 1000,    
+  max: 5,                     
+  standardHeaders: true,      
   legacyHeaders: false,
   validate: { xForwardedForHeader: false },
   message: {
@@ -97,7 +97,7 @@ app.get('/health', (req, res) => {
 
 // ─── Start Server ───────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`\n  ⚡ CodeForge API running on http://localhost:${PORT}`);
+  console.log(`\n  ⚡ Codeezy API running on http://localhost:${PORT}`);
   console.log(`  📋 POST /execute  — Run code`);
   console.log(`  💚 GET  /health   — Health check\n`);
 });

@@ -31,17 +31,17 @@ async function executeCode(language, code, input = '') {
 async function executePython(code, input) {
   const tmpFile = createTempFile('code.py', code);
   try {
-    return await runCommand('python', [tmpFile], input);
-  } catch (err) {
-    // Fallback: try 'python3' if 'python' not found
-    try {
-      return await runCommand('python3', [tmpFile], input);
-    } catch {
-      return {
-        output: '',
-        error: 'Python is not installed or not in PATH. ' + err.message,
-      };
+    let res = await runCommand('python', [tmpFile], input);
+    if (res.error && res.error.includes('ENOENT')) {
+      res = await runCommand('python3', [tmpFile], input);
     }
+    if (res.error && res.error.includes('ENOENT')) {
+      res = await runCommand('py', [tmpFile], input);
+    }
+    if (res.error && res.error.includes('ENOENT')) {
+      res.error = 'Python is not installed or not in PATH.';
+    }
+    return res;
   } finally {
     cleanupTempFile(tmpFile);
   }
@@ -49,7 +49,7 @@ async function executePython(code, input) {
 
 // ─── C Executor ─────────────────────────────────────────────
 async function executeC(code, input) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cforge-c-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codeezy-c-'));
   const srcFile = path.join(tmpDir, 'code.c');
   const outFile = path.join(tmpDir, os.platform() === 'win32' ? 'code.exe' : 'code');
 
@@ -76,7 +76,7 @@ async function executeC(code, input) {
 
 // ─── Java Executor ──────────────────────────────────────────
 async function executeJava(code, input) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cforge-java-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codeezy-java-'));
 
   // Extract class name from code (look for "public class <Name>")
   const classMatch = code.match(/public\s+class\s+(\w+)/);
@@ -107,7 +107,7 @@ async function executeJava(code, input) {
 // ─── Helpers ────────────────────────────────────────────────
 
 function createTempFile(filename, content) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cforge-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codeezy-'));
   const filePath = path.join(tmpDir, filename);
   fs.writeFileSync(filePath, content, 'utf-8');
   return filePath;
@@ -135,7 +135,7 @@ function runCommand(cmd, args, input) {
     const proc = execFile(cmd, args, {
       timeout: EXECUTION_TIMEOUT,
       maxBuffer: 1024 * 1024, // 1MB output limit
-      env: { ...process.env, PATH: extendedPath },
+      env: { ...process.env, PATH: extendedPath, PYTHONIOENCODING: 'utf-8', LANG: 'en_US.UTF-8' },
     }, (error, stdout, stderr) => {
       if (error) {
         // Timeout
