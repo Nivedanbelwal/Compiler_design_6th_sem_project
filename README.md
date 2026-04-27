@@ -202,13 +202,10 @@ int main() {
 - [x] **DFA (Deterministic Finite Automata)** — State machine visualization
 - [x] **Token Classification** — Keywords, Identifiers, Constants, Operators, Delimiters
 - [x] **DFA Simulation** — Step-by-step character processing
-- [ ] **Syntax Analysis** — Parse trees, LL(1) parsing *(coming soon)*
-- [ ] **Semantic Analysis** — Symbol tables, type checking *(coming soon)*
-- [ ] **Intermediate Code** — Three-address code generation *(coming soon)*
 
 ---
 
-## 🔮 Roadmap
+## 🔮 Completed Milestones
 
 | Phase | Feature | Status |
 |-------|---------|--------|
@@ -216,9 +213,6 @@ int main() {
 | ✅ Phase 2 | Backend API (C/Python/Java) | Complete |
 | ✅ Phase 3 | Lexical Analyzer + Token Table | Complete |
 | ✅ Phase 4 | DFA Visualization + Simulator | Complete |
-| 🔲 Phase 5 | Syntax Analyzer (Parser + Parse Tree) | Planned |
-| 🔲 Phase 6 | Symbol Table Manager | Planned |
-| 🔲 Phase 7 | Three-Address Code Generator | Planned |
 
 ---
 
