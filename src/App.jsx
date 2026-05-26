@@ -356,7 +356,7 @@ export default function App() {
             <div className="logo-icon">
               <Code2 size={18} color="#fff" />
             </div>
-            <span className="logo-text">Codeezy</span>
+            <span className="logo-text">Static Code Analyzer</span>
           </div>
 
           <div className="header-divider" />
@@ -905,7 +905,7 @@ export default function App() {
           )}
         </div>
         <div className="footer-right">
-          <span className="footer-item">Codeezy v2.1 — Intermediate Code Edition</span>
+          <span className="footer-item">Static Code Analyzer v2.1 — Intermediate Code Edition</span>
         </div>
       </footer>
     </div>

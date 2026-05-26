@@ -1,5 +1,5 @@
 // ============================================
-// Codeezy — C Language Lexical Analyzer
+// Static Code Analyzer — C Language Lexical Analyzer
 // ============================================
 
 // C language keywords

@@ -49,7 +49,7 @@ async function executePython(code, input) {
 
 // ─── C Executor ─────────────────────────────────────────────
 async function executeC(code, input) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codeezy-c-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'static-code-analyzer-c-'));
   const srcFile = path.join(tmpDir, 'code.c');
   const outFile = path.join(tmpDir, os.platform() === 'win32' ? 'code.exe' : 'code');
 
@@ -76,7 +76,7 @@ async function executeC(code, input) {
 
 // ─── Java Executor ──────────────────────────────────────────
 async function executeJava(code, input) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codeezy-java-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'static-code-analyzer-java-'));
 
   // Extract class name from code (look for "public class <Name>")
   const classMatch = code.match(/public\s+class\s+(\w+)/);
@@ -107,7 +107,7 @@ async function executeJava(code, input) {
 // ─── Helpers ────────────────────────────────────────────────
 
 function createTempFile(filename, content) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codeezy-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'static-code-analyzer-'));
   const filePath = path.join(tmpDir, filename);
   fs.writeFileSync(filePath, content, 'utf-8');
   return filePath;

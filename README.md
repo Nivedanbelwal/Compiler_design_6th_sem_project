@@ -1,6 +1,6 @@
 <h1 align="center">
   <img src="https://img.icons8.com/fluency/48/source-code.png" width="36" />
-  Codeezy — Compiler Design Lab
+  Static Code Analyzer — Compiler Design Lab
 </h1>
 
 <p align="center">
@@ -17,9 +17,9 @@
 
 ---
 
-## 🎯 What is Codeezy?
+## 🎯 What is Static Code Analyzer?
 
-Codeezy is a **web-based Compiler Design Lab** that helps students and developers understand how compilers work — from source code to tokens to DFA state machines. It features **two modes**:
+Static Code Analyzer is a **web-based Compiler Design Lab** that helps students and developers understand how compilers work — from source code to tokens to DFA state machines. It features **two modes**:
 
 | Mode | Description |
 |------|-------------|

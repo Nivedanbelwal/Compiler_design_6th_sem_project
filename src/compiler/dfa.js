@@ -1,5 +1,5 @@
 // ============================================
-// Codeezy — DFA Definitions & Simulator
+// Static Code Analyzer — DFA Definitions & Simulator
 // ============================================
 
 /**
