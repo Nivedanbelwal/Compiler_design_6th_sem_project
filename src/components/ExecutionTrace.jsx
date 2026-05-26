@@ -15,7 +15,18 @@ export default function ExecutionTrace({ simulationResult }) {
 
   return (
     <div className="exec-trace">
-      <h3 className="exec-trace-title">Execution Trace</h3>
+      {/* Educational Explanation Card */}
+      <div className="info-banner-card">
+        <span className="info-banner-emoji">💡</span>
+        <div className="info-banner-body">
+          <h4 className="info-banner-title">What is this?</h4>
+          <p className="info-banner-text">
+            The <strong>Execution Trace</strong> simulates how the Lexer processes the selected token character-by-character through the Deterministic Finite Automaton (DFA). It shows the exact state transitions (e.g., q0 → q1) to prove that the lexeme matches the grammar rules during the Lexical Analysis phase.
+          </p>
+        </div>
+      </div>
+
+      <h3 className="exec-trace-title">Execution Steps</h3>
 
       <div className="exec-trace-steps">
         {steps.map((step, i) => {

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import {
   Play,
@@ -11,15 +11,28 @@ import {
   Cpu,
   Scan,
   FlaskConical,
+  Zap,
+  Maximize2,
+  Minimize2,
+  Sparkles,
+  AlertCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { DEFAULT_CODE, LANGUAGES } from './constants.js';
 import { tokenize } from './compiler/lexer.js';
 import { IDENTIFIER_DFA, simulateDFA, getDFAForToken, ALL_DFAS } from './compiler/dfa.js';
+import { generateTAC } from './compiler/tac.js';
+import { optimizeTAC } from './compiler/optimizer.js';
 import TokenTable from './components/TokenTable.jsx';
 import OutputSummary from './components/OutputSummary.jsx';
 import DFAVisualizer from './components/DFAVisualizer.jsx';
 import DFASelector from './components/DFASelector.jsx';
 import ExecutionTrace from './components/ExecutionTrace.jsx';
+import OptimizationFlow from './components/OptimizationFlow.jsx';
+import CompilerPlayground from './components/CompilerPlayground.jsx';
+import ASTVisualizer from './components/ASTVisualizer.jsx';
+import AIExplanationBot from './components/AIExplanationBot.jsx';
+import { tokenizeSmart, SmartParser, SmartInterpreter } from './compiler/smartCompiler.js';
 import './index.css';
 
 // Map language id to a Lucide icon
@@ -33,9 +46,11 @@ const langIconMap = {
 const COMPILER_LAB_DEFAULT = `#include <stdio.h>
 
 int main() {
-    int x = 42;
-    float pi = 3.14159;
-
+    int a = 10;
+    int b = 20;
+    int c = a + b * 5;
+    int d = (a + b) / 2;
+    
     return 0;
 }`;
 
@@ -63,6 +78,15 @@ export default function App() {
   const [activeDFA, setActiveDFA] = useState(IDENTIFIER_DFA);
   const [simulationResult, setSimulationResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGeneratingTAC, setIsGeneratingTAC] = useState(false);
+  const [tacInstructions, setTacInstructions] = useState([]);
+  const [optimizedInstructions, setOptimizedInstructions] = useState([]);
+  const [tacErrors, setTacErrors] = useState([]);
+  const [isTraceExpanded, setIsTraceExpanded] = useState(false);
+  const [activeLabTab, setActiveLabTab] = useState('tokens'); // 'tokens' | 'dfa' | 'trace' | 'tac' | 'ast' | 'symbols' | 'warnings' | 'aibot'
+  const [smartAst, setSmartAst] = useState(null);
+  const [smartSymbols, setSmartSymbols] = useState({});
+  const [smartWarnings, setSmartWarnings] = useState([]);
   const labEditorRef = useRef(null);
 
   // ─── Mode switch handler ──────────────────────────────
@@ -182,11 +206,104 @@ export default function App() {
       setTokens(result.tokens);
       setAnalysisStats(result.stats);
       setAnalysisErrors(result.errors);
-      setSelectedToken(null);
-      setSimulationResult(null);
+      const firstValidToken = result.tokens.find(t => t.type !== 'DELIMITER' && t.type !== 'WHITESPACE');
+      if (firstValidToken) {
+        setSelectedToken(firstValidToken);
+        const dfa = getDFAForToken(firstValidToken);
+        setActiveDFA(dfa);
+        const simResult = simulateDFA(dfa, firstValidToken.lexeme);
+        setSimulationResult(simResult);
+      } else {
+        setSelectedToken(null);
+        setSimulationResult(null);
+      }
+
+      // Smart C Parser Integration
+      try {
+        const smartTokens = tokenizeSmart(labCode);
+        const parser = new SmartParser(smartTokens);
+        const parsedAst = parser.parse();
+        setSmartAst(parsedAst);
+
+        const interpreter = new SmartInterpreter();
+        const runResult = interpreter.execute(parsedAst);
+
+        setSmartSymbols(runResult?.variables || {});
+        setSmartWarnings(parsedAst.warnings || []);
+      } catch (err) {
+        console.error("Smart compilation failed: ", err);
+      }
+
       setIsAnalyzing(false);
+      // Reset TAC when code changes
+      setTacInstructions([]);
+      setOptimizedInstructions([]);
+      setTacErrors([]);
     }, 300);
   }, [labCode]);
+
+  // Trigger C compile and analyze on initial mount
+  const mountRef = useRef(false);
+  useEffect(() => {
+    if (!mountRef.current) {
+      mountRef.current = true;
+      handleAnalyze();
+    }
+  }, [handleAnalyze]);
+
+  // Live Debounced C Compiler Analysis (Triggers reactively as the user types!)
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      const result = tokenize(labCode);
+      setTokens(result.tokens);
+      setAnalysisStats(result.stats);
+      setAnalysisErrors(result.errors);
+
+      const firstValidToken = result.tokens.find(t => t.type !== 'DELIMITER' && t.type !== 'WHITESPACE');
+      if (firstValidToken) {
+        setSelectedToken(firstValidToken);
+        const dfa = getDFAForToken(firstValidToken);
+        setActiveDFA(dfa);
+        const simResult = simulateDFA(dfa, firstValidToken.lexeme);
+        setSimulationResult(simResult);
+      }
+
+      try {
+        const smartTokens = tokenizeSmart(labCode);
+        const parser = new SmartParser(smartTokens);
+        const parsedAst = parser.parse();
+        setSmartAst(parsedAst);
+
+        const interpreter = new SmartInterpreter();
+        const runResult = interpreter.execute(parsedAst);
+
+        setSmartSymbols(runResult?.variables || {});
+        setSmartWarnings(parsedAst.warnings || []);
+      } catch (err) {
+        console.error("Live reactive parsing failed: ", err);
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [labCode]);
+
+  const handleGenerateTAC = useCallback(() => {
+    setIsGeneratingTAC(true);
+    setTimeout(() => {
+      const { tokens: latestTokens } = tokenize(labCode);
+      const { instructions, errors } = generateTAC(latestTokens);
+      setTacInstructions(instructions);
+      setOptimizedInstructions([]); // Reset optimized version
+      setTacErrors(errors);
+      setIsGeneratingTAC(false);
+    }, 400);
+  }, [labCode]);
+
+  const handleOptimizeTAC = useCallback(() => {
+    if (tacInstructions.length === 0) return;
+    const optimized = optimizeTAC(tacInstructions);
+    setOptimizedInstructions(optimized);
+  }, [tacInstructions]);
 
   const handleSelectToken = useCallback((token) => {
     setSelectedToken(token);
@@ -214,7 +331,14 @@ export default function App() {
     setAnalysisErrors([]);
     setSelectedToken(null);
     setSimulationResult(null);
+    setTacInstructions([]);
+    setTacErrors([]);
+    setSmartAst(null);
+    setSmartSymbols({});
+    setSmartWarnings([]);
   }, []);
+
+  const toggleTraceExpand = () => setIsTraceExpanded(!isTraceExpanded);
 
   // ─── Derived ──────────────────────────────────────────
   const currentLang = LANGUAGES.find((l) => l.id === language);
@@ -224,7 +348,7 @@ export default function App() {
   //  RENDER
   // ═══════════════════════════════════════════════════════
   return (
-    <div className="app-container">
+    <div className={`app-container ${isTraceExpanded ? 'trace-expanded' : ''}`}>
       {/* ─── Header / Toolbar ─── */}
       <header className="header" id="main-header">
         <div className="header-left">
@@ -280,7 +404,7 @@ export default function App() {
           {mode === 'lab' && (
             <>
               <div className="header-divider" />
-              <span className="lab-badge">C Language • Lexical Analysis</span>
+              <span className="lab-badge">C Language • Intermediate Code</span>
             </>
           )}
         </div>
@@ -316,6 +440,17 @@ export default function App() {
                   <Scan size={14} />
                 </span>
                 <span>{isAnalyzing ? 'Analyzing…' : 'Analyze Code'}</span>
+              </button>
+              <button
+                className="run-btn tac-btn"
+                onClick={handleGenerateTAC}
+                disabled={isGeneratingTAC}
+                id="tac-button"
+              >
+                <span className="btn-icon">
+                  <Zap size={14} />
+                </span>
+                <span>{isGeneratingTAC ? 'Generating…' : 'Generate TAC'}</span>
               </button>
               <button className="clear-btn-header" onClick={handleLabClear} id="clear-lab-btn">
                 <Trash2 size={14} />
@@ -409,108 +544,332 @@ export default function App() {
       ) : (
         /* ═══ COMPILER LAB MODE ═══ */
         <main className="lab-content" id="compiler-lab">
-          {/* Row 1: Source + Tokens + DFA Selector */}
-          <div className="lab-grid">
-            {/* Panel 1: Source Code Editor */}
-            <div className="lab-panel lab-source" id="lab-source-panel">
-              <div className="lab-panel-header">
-                <span className="lab-panel-num">1</span>
-                <span className="lab-panel-title">Source Code</span>
+          <div className="lab-split-container">
+            {/* Left Side: C Source Code Editor */}
+            <div className="lab-split-left">
+              <div className="lab-panel lab-source full-height-panel" id="lab-source-panel">
+                <div className="lab-panel-header">
+                  <span className="lab-panel-num">1</span>
+                  <span className="lab-panel-title">Source Code Editor (C Language)</span>
+                  <div className="lab-panel-actions">
+                    <button className="panel-action-btn" onClick={handleGenerateTAC} title="Generate TAC">
+                      <Zap size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="lab-editor-wrap">
+                  <Editor
+                    height="100%"
+                    language="c"
+                    value={labCode}
+                    onChange={(value) => setLabCode(value || '')}
+                    onMount={handleLabEditorMount}
+                    theme="vs-dark"
+                    loading={
+                      <div className="editor-loading">
+                        <div className="loading-spinner" />
+                        <span>Loading C Editor…</span>
+                      </div>
+                    }
+                    options={{
+                      fontSize: 14,
+                      fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                      minimap: { enabled: false },
+                      scrollBeyondLastLine: false,
+                      lineNumbers: 'on',
+                      padding: { top: 12, bottom: 12 },
+                      renderLineHighlight: 'all',
+                      bracketPairColorization: { enabled: true },
+                      tabSize: 4,
+                      wordWrap: 'on',
+                    }}
+                  />
+                </div>
+                <button
+                  className="lab-analyze-inline"
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing}
+                >
+                  <Scan size={14} />
+                  <span>{isAnalyzing ? 'Analyzing…' : 'Analyze Code'}</span>
+                </button>
               </div>
-              <div className="lab-editor-wrap">
-                <Editor
-                  height="100%"
-                  language="c"
-                  value={labCode}
-                  onChange={(value) => setLabCode(value || '')}
-                  onMount={handleLabEditorMount}
-                  theme="vs-dark"
-                  loading={
-                    <div className="editor-loading">
-                      <div className="loading-spinner" />
-                      <span>Loading…</span>
+            </div>
+
+            {/* Right Side: Horizontal Movable Bar & Dynamic Visual Output Viewer */}
+            <div className="lab-split-right">
+              <div className="viewer-panel">
+                {/* Horizontal Movable Tab Bar */}
+                <div className="horizontal-movable-bar">
+                  <button
+                    className={`nav-tab-btn ${activeLabTab === 'tokens' ? 'active' : ''}`}
+                    onClick={() => setActiveLabTab('tokens')}
+                  >
+                    Tokens
+                  </button>
+                  <button
+                    className={`nav-tab-btn ${activeLabTab === 'dfa' ? 'active' : ''}`}
+                    onClick={() => setActiveLabTab('dfa')}
+                  >
+                    DFA Visualization
+                  </button>
+                  <button
+                    className={`nav-tab-btn ${activeLabTab === 'trace' ? 'active' : ''}`}
+                    onClick={() => setActiveLabTab('trace')}
+                  >
+                    Execution Trace
+                  </button>
+                  <button
+                    className={`nav-tab-btn ${activeLabTab === 'tac' ? 'active' : ''}`}
+                    onClick={() => setActiveLabTab('tac')}
+                  >
+                    Transformation Pipeline (TAC)
+                  </button>
+                  <button
+                    className={`nav-tab-btn ${activeLabTab === 'ast' ? 'active' : ''}`}
+                    onClick={() => setActiveLabTab('ast')}
+                  >
+                    AST Tree
+                  </button>
+                  <button
+                    className={`nav-tab-btn ${activeLabTab === 'symbols' ? 'active' : ''}`}
+                    onClick={() => setActiveLabTab('symbols')}
+                  >
+                    Symbol Table
+                  </button>
+                  <button
+                    className={`nav-tab-btn ${activeLabTab === 'warnings' ? 'active' : ''}`}
+                    onClick={() => setActiveLabTab('warnings')}
+                  >
+                    Warnings & Alerts
+                  </button>
+                  <button
+                    className={`nav-tab-btn ${activeLabTab === 'aibot' ? 'active' : ''}`}
+                    onClick={() => setActiveLabTab('aibot')}
+                  >
+                    ✨ AI Assistant
+                  </button>
+                </div>
+
+                {/* Viewport for Rendered Output Phase */}
+                <div className="viewer-viewport">
+                  {activeLabTab === 'tokens' && (
+                    <div className="lab-panel lab-tokens full-height-panel animate-slide-up">
+                      <div className="lab-panel-header">
+                        <span className="lab-panel-num">2</span>
+                        <span className="lab-panel-title">Analyzed Tokens</span>
+                        {tokens.length > 0 && <span className="lab-panel-badge">{tokens.length} tokens</span>}
+                      </div>
+                      <div className="lab-panel-body">
+                        <TokenTable
+                          tokens={tokens}
+                          selectedTokenId={selectedToken?.id}
+                          onSelectToken={handleSelectToken}
+                        />
+                      </div>
                     </div>
-                  }
-                  options={{
-                    fontSize: 14,
-                    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                    minimap: { enabled: false },
-                    scrollBeyondLastLine: false,
-                    lineNumbers: 'on',
-                    padding: { top: 12, bottom: 12 },
-                    renderLineHighlight: 'all',
-                    bracketPairColorization: { enabled: true },
-                    tabSize: 4,
-                    wordWrap: 'on',
-                  }}
-                />
-              </div>
-              <button
-                className="lab-analyze-inline"
-                onClick={handleAnalyze}
-                disabled={isAnalyzing}
-              >
-                <Scan size={14} />
-                <span>{isAnalyzing ? 'Analyzing…' : 'Analyze Code'}</span>
-              </button>
-            </div>
+                  )}
 
-            {/* Panel 2: Token Table */}
-            <div className="lab-panel lab-tokens" id="lab-tokens-panel">
-              <div className="lab-panel-header">
-                <span className="lab-panel-num">2</span>
-                <span className="lab-panel-title">Tokens</span>
-                {tokens.length > 0 && (
-                  <span className="lab-panel-badge">{tokens.length} tokens</span>
-                )}
-              </div>
-              <div className="lab-panel-body">
-                <TokenTable
-                  tokens={tokens}
-                  selectedTokenId={selectedToken?.id}
-                  onSelectToken={handleSelectToken}
-                />
-              </div>
-            </div>
+                  {activeLabTab === 'dfa' && (
+                    <div className="lab-panel lab-dfa-viz full-height-panel animate-slide-up">
+                      <div className="lab-panel-header">
+                        <span className="lab-panel-num">3</span>
+                        <span className="lab-panel-title">DFA State Simulation</span>
+                      </div>
+                      <div className="dfa-split-container">
+                        <DFASelector
+                          activeDFA={activeDFA}
+                          onSelectDFA={handleSelectDFA}
+                          selectedToken={selectedToken}
+                        />
+                        <div className="lab-panel-body dfa-panel-body">
+                          <DFAVisualizer
+                            dfa={activeDFA}
+                            simulationResult={simulationResult}
+                            selectedToken={selectedToken}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-            {/* Panel: DFA Selector */}
-            <div className="lab-panel lab-dfa-selector" id="lab-dfa-selector-panel">
-              <DFASelector
-                activeDFA={activeDFA}
-                onSelectDFA={handleSelectDFA}
-                selectedToken={selectedToken}
-              />
-            </div>
+                  {activeLabTab === 'trace' && (
+                    <div className="lab-panel lab-trace full-height-panel animate-slide-up">
+                      <div className="lab-panel-header">
+                        <span className="lab-panel-num">4</span>
+                        <span className="lab-panel-title">DFA Step Execution Trace</span>
+                      </div>
+                      <div className="lab-panel-body">
+                        <ExecutionTrace simulationResult={simulationResult} />
+                      </div>
+                    </div>
+                  )}
 
-            {/* Panel 3: Output Summary */}
-            <div className="lab-panel lab-output" id="lab-output-panel">
-              <div className="lab-panel-header">
-                <span className="lab-panel-num">3</span>
-                <span className="lab-panel-title">Output</span>
-              </div>
-              <div className="lab-panel-body">
-                <OutputSummary stats={analysisStats} errors={analysisErrors} />
-              </div>
-            </div>
+                  {activeLabTab === 'tac' && (
+                    <div className="lab-panel lab-tac full-height-panel animate-slide-up">
+                      <div className="lab-panel-header">
+                        <span className="lab-panel-num">5</span>
+                        <span className="lab-panel-title">Intermediate Code Pipeline (TAC)</span>
+                      </div>
+                      <div className="lab-panel-body">
+                        <OptimizationFlow 
+                          tacInstructions={tacInstructions} 
+                          optimizedInstructions={optimizedInstructions}
+                          onOptimize={handleOptimizeTAC}
+                        />
+                      </div>
+                    </div>
+                  )}
 
-            {/* Panel 4: DFA Visualization */}
-            <div className="lab-panel lab-dfa-viz" id="lab-dfa-viz-panel">
-              <div className="lab-panel-header">
-                <span className="lab-panel-num">4</span>
-                <span className="lab-panel-title">DFA Visualization</span>
-              </div>
-              <div className="lab-panel-body dfa-panel-body">
-                <DFAVisualizer
-                  dfa={activeDFA}
-                  simulationResult={simulationResult}
-                  selectedToken={selectedToken}
-                />
-              </div>
-            </div>
+                  {activeLabTab === 'ast' && (
+                    <div className="lab-panel lab-ast full-height-panel animate-slide-up">
+                      <div className="lab-panel-header">
+                        <span className="lab-panel-num">6</span>
+                        <span className="lab-panel-title">Abstract Syntax Tree (AST) Visualizer</span>
+                      </div>
+                      <div className="lab-panel-body">
+                        <ASTVisualizer ast={smartAst} />
+                      </div>
+                    </div>
+                  )}
 
-            {/* Panel: Execution Trace */}
-            <div className="lab-panel lab-trace" id="lab-trace-panel">
-              <ExecutionTrace simulationResult={simulationResult} />
+                  {activeLabTab === 'symbols' && (
+                    <div className="lab-panel lab-symbols full-height-panel animate-slide-up">
+                      <div className="lab-panel-header">
+                        <span className="lab-panel-num">7</span>
+                        <span className="lab-panel-title">Symbol Table Registry</span>
+                      </div>
+                      <div className="lab-panel-body" style={{ padding: '20px', overflowY: 'auto' }}>
+                        {/* Educational Explanation Card */}
+                        <div className="info-banner-card">
+                          <span className="info-banner-emoji">📋</span>
+                          <div className="info-banner-body">
+                            <h4 className="info-banner-title">What is this?</h4>
+                            <p className="info-banner-text">
+                              The <strong>Symbol Table</strong> is a vital compiler database data structure used to store information about identifiers (such as variable names, types, scopes, and memory locations) encountered in the source code. It is populated during the Lexical/Syntax Analysis phases and checked in Semantic Analysis to ensure identifiers are declared correctly and prevent type conflicts.
+                            </p>
+                          </div>
+                        </div>
+
+                        {Object.keys(smartSymbols).length === 0 ? (
+                          <div className="tab-pane-empty" style={{ minHeight: '150px' }}>
+                            <span>No active symbols. Analyze C code with variables to populate.</span>
+                          </div>
+                        ) : (
+                          <div className="symbols-table-wrapper" style={{ marginTop: '20px' }}>
+                            <table className="symbols-table">
+                              <thead>
+                                <tr>
+                                  <th>Name</th>
+                                  <th>Type</th>
+                                  <th>Scope</th>
+                                  <th>Category</th>
+                                  <th>Additional Info</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {Object.entries(smartSymbols).map(([name, data]) => {
+                                  const nameVal = data.name || name;
+                                  const typeVal = data.type || 'int';
+                                  const scopeVal = data.scope || 'Local (main)';
+                                  const catVal = data.category || 'Variable';
+                                  const infoVal = data.additionalInfo || `Value: ${data.value} | Stack allocated`;
+
+                                  // Choose category color dynamically for beautiful contrast
+                                  let catColor = 'rgba(255, 159, 67, 0.1)';
+                                  let catTextColor = '#ff9f43';
+                                  if (catVal === 'Function') {
+                                    catColor = 'rgba(108, 99, 255, 0.1)';
+                                    catTextColor = '#6c63ff';
+                                  } else if (catVal === 'Parameter') {
+                                    catColor = 'rgba(0, 207, 232, 0.1)';
+                                    catTextColor = '#00cfe8';
+                                  }
+
+                                  return (
+                                    <tr key={name}>
+                                      <td className="symbol-name-col">
+                                        <span className="symbol-name-badge">{nameVal}</span>
+                                      </td>
+                                      <td className="symbol-type-col">
+                                        <span className="symbol-type-badge" style={{ background: 'rgba(0, 214, 143, 0.1)', color: '#00d68f', border: '1px solid rgba(0, 214, 143, 0.2)' }}>
+                                          {typeVal}
+                                        </span>
+                                      </td>
+                                      <td className="symbol-scope-col">
+                                        <span className="symbol-scope-badge" style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'rgba(255, 255, 255, 0.8)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                                          {scopeVal}
+                                        </span>
+                                      </td>
+                                      <td className="symbol-cat-col">
+                                        <span className="symbol-cat-badge" style={{ background: catColor, color: catTextColor, padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: `1px solid ${catTextColor}30` }}>
+                                          {catVal}
+                                        </span>
+                                      </td>
+                                      <td className="symbol-info-col" style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '13px', fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}>
+                                        {infoVal}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeLabTab === 'warnings' && (
+                    <div className="lab-panel lab-warnings full-height-panel animate-slide-up">
+                      <div className="lab-panel-header">
+                        <span className="lab-panel-num">8</span>
+                        <span className="lab-panel-title">Static Audit Alerts & Errors</span>
+                      </div>
+                      <div className="lab-panel-body" style={{ padding: '20px' }}>
+                        {smartWarnings.length === 0 && analysisErrors.length === 0 ? (
+                          <div className="tab-pane-empty">
+                            <span>No compile warnings or syntax issues found!</span>
+                          </div>
+                        ) : (
+                          <div className="error-list">
+                            {analysisErrors.map((err, i) => (
+                              <div key={i} className="error-item-alert">
+                                <AlertCircle size={16} className="alert-icon-red" />
+                                <div className="error-alert-body">
+                                  <span className="error-alert-line">Lexer Error</span>
+                                  <p className="error-alert-text">{err}</p>
+                                </div>
+                              </div>
+                            ))}
+                            {smartWarnings.map((warn, i) => (
+                              <div key={i} className="warning-item-alert">
+                                <AlertTriangle size={16} className="alert-icon-orange" />
+                                <div className="warning-alert-body">
+                                  <span className="warning-alert-line">Line {warn.line}</span>
+                                  <p className="warning-alert-text">{warn.message}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeLabTab === 'aibot' && (
+                    <div className="lab-panel lab-aibot full-height-panel animate-slide-up">
+                      <div className="lab-panel-header">
+                        <span className="lab-panel-num">9</span>
+                        <span className="lab-panel-title">AI Assistant Bot</span>
+                      </div>
+                      <div className="lab-panel-body">
+                        <AIExplanationBot code={labCode} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </main>
@@ -546,7 +905,7 @@ export default function App() {
           )}
         </div>
         <div className="footer-right">
-          <span className="footer-item">Codeezy v2.0</span>
+          <span className="footer-item">Codeezy v2.1 — Intermediate Code Edition</span>
         </div>
       </footer>
     </div>

@@ -1,11 +1,11 @@
 import { ALL_DFAS } from '../compiler/dfa.js';
+import { MousePointer2, Info } from 'lucide-react';
 
 /**
  * DFASelector — Sidebar panel to choose which DFA to visualize.
- * Shows DFA metadata, pattern, examples, and highlights the active one.
+ * Optimized for space efficiency.
  */
 export default function DFASelector({ activeDFA, onSelectDFA, selectedToken }) {
-  // Determine which DFA matches the selected token
   const getRecommendedDFA = () => {
     if (!selectedToken) return null;
     switch (selectedToken.type) {
@@ -21,11 +21,11 @@ export default function DFASelector({ activeDFA, onSelectDFA, selectedToken }) {
 
   return (
     <div className="dfa-selector">
-      <h3 className="dfa-selector-title">DFA Selector</h3>
-      <p className="dfa-selector-subtitle">Choose DFA to visualize</p>
-
-      {/* Active DFA dropdown */}
-      <div className="dfa-selector-active">
+      <div className="dfa-selector-section">
+        <div className="dfa-section-header">
+          <MousePointer2 size={14} />
+          <span>Active DFA</span>
+        </div>
         <select
           className="dfa-select-dropdown"
           value={activeDFA?.name || ''}
@@ -42,36 +42,41 @@ export default function DFASelector({ activeDFA, onSelectDFA, selectedToken }) {
         </select>
       </div>
 
-      {/* Active DFA Info */}
       {activeDFA && (
         <div className="dfa-info-card">
-          <h4 className="dfa-info-title">DFA for {activeDFA.shortName}s</h4>
-          <div className="dfa-info-row">
-            <span className="dfa-info-label">Pattern:</span>
-            <code className="dfa-info-pattern">{activeDFA.pattern}</code>
+          <div className="dfa-info-header">
+            <Info size={12} />
+            <span>{activeDFA.shortName} Info</span>
           </div>
-          <div className="dfa-info-row">
-            <span className="dfa-info-label">Example:</span>
-            <span className="dfa-info-examples">{activeDFA.examples.join(', ')}</span>
+          <div className="dfa-info-content">
+            <div className="dfa-info-item">
+              <span className="dfa-info-label">Pattern</span>
+              <code className="dfa-info-value">{activeDFA.pattern}</code>
+            </div>
+            <div className="dfa-info-item">
+              <span className="dfa-info-label">Example</span>
+              <span className="dfa-info-value">{activeDFA.examples[0]}, ...</span>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Other DFAs */}
-      <div className="dfa-other-list">
-        <h4 className="dfa-other-title">Other DFAs</h4>
-        {ALL_DFAS.filter(d => d.name !== activeDFA?.name).map((dfa) => (
-          <button
-            key={dfa.name}
-            className={`dfa-other-item ${recommendedName === dfa.name ? 'recommended' : ''}`}
-            onClick={() => onSelectDFA(dfa)}
-          >
-            <span>{dfa.shortName} DFA</span>
-            {recommendedName === dfa.name && (
-              <span className="dfa-recommended-badge">suggested</span>
-            )}
-          </button>
-        ))}
+      <div className="dfa-selector-section">
+        <div className="dfa-section-header">
+          <span>Other Options</span>
+        </div>
+        <div className="dfa-chip-grid">
+          {ALL_DFAS.map((dfa) => (
+            <button
+              key={dfa.name}
+              className={`dfa-chip ${activeDFA?.name === dfa.name ? 'active' : ''} ${recommendedName === dfa.name ? 'recommended' : ''}`}
+              onClick={() => onSelectDFA(dfa)}
+            >
+              {dfa.shortName}
+              {recommendedName === dfa.name && <span className="recommended-dot" />}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
