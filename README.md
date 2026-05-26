@@ -84,8 +84,8 @@ Static Code Analyzer is a **web-based Compiler Design Lab** that helps students 
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Vyomesh-001/Compiler-design.git
-cd Compiler-design
+git clone https://github.com/Nivedanbelwal/Compiler_design_6th_sem_project.git
+cd Compiler_design_6th_sem_project
 
 # 2. Install frontend dependencies
 npm install
@@ -218,7 +218,7 @@ int main() {
 
 ## 👨‍💻 Author
 
-**Vyomesh** — [@Vyomesh-001](https://github.com/Vyomesh-001)
+**Nivedan Belwal** — [@Nivedanbelwal](https://github.com/Nivedanbelwal)
 
 ---
 
